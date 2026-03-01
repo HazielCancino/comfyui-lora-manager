@@ -3,18 +3,18 @@ from flask_cors import CORS
 import os
 import subprocess
 import mysql.connector
+from dotenv import load_dotenv
+
+load_dotenv(os.path.join(os.path.dirname(__file__), ".env"))
 
 app = Flask(__name__)
 CORS(app)
 
-# =========================
-# DB CONFIG
-# =========================
 DB_CONFIG = {
-    "host": "localhost",
-    "user": "root",
-    "password": "YOUR_PASSWORD_HERE",
-    "database": "comfyui_assets"
+    "host":     os.getenv("DB_HOST", "localhost"),
+    "user":     os.getenv("DB_USER", "root"),
+    "password": os.getenv("DB_PASSWORD", ""),
+    "database": os.getenv("DB_NAME", "comfyui_assets")
 }
 
 # =========================

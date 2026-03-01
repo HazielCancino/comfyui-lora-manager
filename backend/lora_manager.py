@@ -2,14 +2,18 @@ import os
 import mysql.connector
 import hashlib
 from datetime import datetime
+from dotenv import load_dotenv
 
-LORA_FOLDER = r"C:\Users\YOUR_USERNAME_AND_FILE_PATH\COMFY\ComfyUI\models\loras"
+# Load .env from the same folder as this script
+load_dotenv(os.path.join(os.path.dirname(__file__), ".env"))
+
+LORA_FOLDER = os.getenv("LORA_FOLDER", r"C:\Users\Haziel\COMFY\ComfyUI\models\loras")
 
 DB_CONFIG = {
-    "host": "localhost",
-    "user": "root",
-    "password": "YOUR_PASSWORD_HERE",
-    "database": "comfyui_assets"
+    "host":     os.getenv("DB_HOST", "localhost"),
+    "user":     os.getenv("DB_USER", "root"),
+    "password": os.getenv("DB_PASSWORD", ""),
+    "database": os.getenv("DB_NAME", "comfyui_assets")
 }
 
 IMAGE_EXTENSIONS = {".png", ".jpg", ".jpeg", ".webp", ".gif"}
