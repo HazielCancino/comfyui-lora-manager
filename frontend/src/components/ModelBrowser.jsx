@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 
-const BASE_MODEL_OPTIONS = ["FLUX", "SDXL", "Pony", "Illustrious", "SD1.5", "SD3", "Qwen", "Wan", "Other"];
+const DEFAULT_BASE_MODELS = ["FLUX", "SDXL", "Pony", "Illustrious", "SD1.5", "SD3", "Qwen", "Wan"];
 
 const TYPE_LABELS = {
   checkpoint: "Checkpoints",
@@ -16,13 +16,13 @@ const TYPE_COLORS = {
   diffusion:  "#818cf8",
 };
 
-function ModelBrowser() {
+function ModelBrowser({ initialTypeFilter = null }) {
   const [models, setModels]         = useState([]);
   const [tagsMap, setTagsMap]       = useState({});
   const [imagesMap, setImagesMap]   = useState({});
   const [allTags, setAllTags]       = useState([]);
   const [search, setSearch]         = useState("");
-  const [typeFilter, setTypeFilter] = useState(null);      // checkpoint | vae | upscaler | diffusion
+  const [typeFilter, setTypeFilter] = useState(initialTypeFilter);      // checkpoint | vae | upscaler | diffusion
   const [folderFilter, setFolderFilter] = useState(null);
   const [tagFilter, setTagFilter]   = useState(null);
   const [focusedModel, setFocusedModel] = useState(null);
@@ -257,45 +257,68 @@ function ModelBrowser() {
   // =========================
   // BASE MODEL SELECTOR
   // =========================
-  function BaseModelBadge({ model }) {
-    const [open, setOpen] = useState(false);
+  function BaseModelField({ model }) {
+    const [open, setOpen]           = useState(false);
+    const [customInput, setCustomInput] = useState("");
     const color = TYPE_COLORS[model.model_type] || "#aaa";
+
+    async function setBase(value) {
+      setOpen(false); setCustomInput("");
+      await saveField(model.id, "base_model", value);
+    }
 
     return (
       <div style={{ position: "relative" }}>
-        <div onClick={() => setOpen(o => !o)}
-          title="Click to set base model"
-          style={{
-            display: "inline-flex", alignItems: "center", gap: 6,
-            background: "#1a1d26", border: `1px solid ${color}33`,
-            borderRadius: 8, padding: "5px 10px", cursor: "pointer",
-            fontSize: 12, color
-          }}>
-          🧠 {model.base_model || "Set base model"} ▾
-        </div>
+        {model.base_model ? (
+          <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+            <div onClick={() => setOpen(o => !o)}
+              style={{ display: "inline-flex", alignItems: "center", gap: 6, background: color + "22", border: `1px solid ${color}55`, borderRadius: 20, padding: "4px 12px", cursor: "pointer", fontSize: 12, color, fontWeight: 600 }}>
+              🧠 {model.base_model} ▾
+            </div>
+            <span onClick={() => saveField(model.id, "base_model", "")} title="Clear"
+              style={{ color: "#444", cursor: "pointer", fontSize: 16 }}
+              onMouseEnter={e => e.target.style.color = "#ef4444"}
+              onMouseLeave={e => e.target.style.color = "#444"}>×</span>
+          </div>
+        ) : (
+          <div onClick={() => setOpen(o => !o)} style={addFieldStyle}>+ Set base model</div>
+        )}
+
         {open && (
-          <div style={{
-            position: "absolute", top: "110%", left: 0, zIndex: 50,
-            background: "#1a1d26", border: "1px solid #333",
-            borderRadius: 8, overflow: "hidden", minWidth: 140
-          }}>
-            {BASE_MODEL_OPTIONS.map(opt => (
-              <div key={opt}
-                onClick={async () => {
-                  setOpen(false);
-                  await saveField(model.id, "base_model", opt);
+          <div style={{ position: "absolute", top: "110%", left: 0, zIndex: 100, background: "#1a1d26", border: "1px solid #333", borderRadius: 10, overflow: "hidden", minWidth: 180, boxShadow: "0 8px 24px rgba(0,0,0,0.5)" }}>
+            <div style={{ padding: "8px 10px", borderBottom: "1px solid #2a2d36" }}>
+              <input autoFocus value={customInput}
+                onChange={e => setCustomInput(e.target.value)}
+                onKeyDown={e => {
+                  if (e.key === "Enter" && customInput.trim()) setBase(customInput.trim());
+                  if (e.key === "Escape") setOpen(false);
                 }}
-                style={{
-                  padding: "7px 12px", cursor: "pointer", fontSize: 12,
-                  background: model.base_model === opt ? "#2a3050" : "transparent",
-                  color: model.base_model === opt ? color : "#aaa"
-                }}
-                onMouseEnter={e => e.currentTarget.style.background = "#2a2d36"}
-                onMouseLeave={e => e.currentTarget.style.background = model.base_model === opt ? "#2a3050" : "transparent"}
-              >
-                {opt}
-              </div>
-            ))}
+                placeholder="Type custom model..."
+                style={{ width: "100%", background: "#111", border: `1px solid ${color}`, color: "white", borderRadius: 6, fontSize: 12, padding: "5px 8px", boxSizing: "border-box" }}
+              />
+            </div>
+            <div style={{ maxHeight: 220, overflowY: "auto" }}>
+              {allBaseModels
+                .filter(opt => !customInput || opt.toLowerCase().includes(customInput.toLowerCase()))
+                .map(opt => (
+                  <div key={opt} onClick={() => setBase(opt)}
+                    style={{ padding: "7px 12px", cursor: "pointer", fontSize: 12, color: model.base_model === opt ? color : "#ccc", background: model.base_model === opt ? color + "22" : "transparent", display: "flex", justifyContent: "space-between" }}
+                    onMouseEnter={e => e.currentTarget.style.background = "#2a2d36"}
+                    onMouseLeave={e => e.currentTarget.style.background = model.base_model === opt ? color + "22" : "transparent"}>
+                    <span>{opt}</span>
+                    {model.base_model === opt && <span style={{ fontSize: 10 }}>✓</span>}
+                  </div>
+                ))
+              }
+              {customInput.trim() && !allBaseModels.some(o => o.toLowerCase() === customInput.toLowerCase()) && (
+                <div onClick={() => setBase(customInput.trim())}
+                  style={{ padding: "7px 12px", cursor: "pointer", fontSize: 12, color, borderTop: "1px solid #2a2d36" }}
+                  onMouseEnter={e => e.currentTarget.style.background = "#2a2d36"}
+                  onMouseLeave={e => e.currentTarget.style.background = "transparent"}>
+                  + Add "{customInput.trim()}"
+                </div>
+              )}
+            </div>
           </div>
         )}
       </div>
@@ -385,7 +408,7 @@ function ModelBrowser() {
           {/* BASE MODEL */}
           <div>
             <div style={labelStyle}>Base Model</div>
-            <BaseModelBadge model={model} />
+              <BaseModelField model={model} />
           </div>
 
           {/* FOLDER */}

@@ -2,6 +2,7 @@ import { useState } from "react";
 import LoraBrowser from "./components/LoraBrowser";
 import ModelBrowser from "./components/ModelBrowser";
 
+
 const TABS = [
   { id: "loras",       label: "LoRAs",       color: "#4da3ff" },
   { id: "checkpoint",  label: "Checkpoints", color: "#f59e0b" },
@@ -69,7 +70,7 @@ function App() {
           setSelectedLoras={setSelectedLoras}
         />
       ) : (
-        <ModelBrowser initialTypeFilter={activeTab} />
+        <ModelBrowser key={activeTab} initialTypeFilter={activeTab} />
       )}
 
     </div>
