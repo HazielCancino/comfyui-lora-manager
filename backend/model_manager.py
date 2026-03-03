@@ -16,7 +16,7 @@ MODEL_FOLDERS = {
     "checkpoint": os.getenv("CHECKPOINT_FOLDER", r"C:\Users\Haziel\COMFY\ComfyUI\models\checkpoints"),
     "vae":        os.getenv("VAE_FOLDER",         r"C:\Users\Haziel\COMFY\ComfyUI\models\vae"),
     "upscaler":   os.getenv("UPSCALER_FOLDER",    r"C:\Users\Haziel\COMFY\ComfyUI\models\upscale_models"),
-    "diffusion":  os.getenv("DIFFUSION_FOLDER",   r"C:\Users\Haziel\COMFY\ComfyUI\models\unet"),
+    "diffusion":  os.getenv("DIFFUSION_FOLDER",   r"C:\Users\Haziel\COMFY\ComfyUI\models\diffusion_models"),
 }
 
 MODEL_EXTENSIONS = {
