@@ -338,6 +338,133 @@ def delete_tag():
     return jsonify({"status": "ok"})
 
 # =========================
+# GET MODELS (filter by type)
+# =========================
+@app.route("/models", methods=["GET"])
+def get_models():
+    model_type = request.args.get("type")  # optional filter
+    db = get_db()
+    cursor = db.cursor(dictionary=True)
+    if model_type:
+        cursor.execute("SELECT * FROM models WHERE model_type=%s ORDER BY name", (model_type,))
+    else:
+        cursor.execute("SELECT * FROM models ORDER BY name")
+    result = cursor.fetchall()
+    cursor.close()
+    db.close()
+    return jsonify(result)
+
+# =========================
+# GET TAGS FOR MODEL
+# =========================
+@app.route("/model_tags/<int:model_id>", methods=["GET"])
+def get_model_tags(model_id):
+    db = get_db()
+    cursor = db.cursor(dictionary=True)
+    cursor.execute("""
+        SELECT tags.id, tags.name
+        FROM tags
+        JOIN model_tags ON tags.id = model_tags.tag_id
+        WHERE model_tags.model_id = %s
+    """, (model_id,))
+    result = cursor.fetchall()
+    cursor.close()
+    db.close()
+    return jsonify(result)
+
+# =========================
+# ASSIGN TAG TO MODEL
+# =========================
+@app.route("/model_assign_tag", methods=["POST"])
+def model_assign_tag():
+    model_id = request.json.get("model_id")
+    tag_id   = request.json.get("tag_id")
+    db = get_db()
+    cursor = db.cursor()
+    cursor.execute("""
+        INSERT IGNORE INTO model_tags (model_id, tag_id) VALUES (%s, %s)
+    """, (model_id, tag_id))
+    db.commit()
+    cursor.close()
+    db.close()
+    return jsonify({"status": "ok"})
+
+# =========================
+# REMOVE TAG FROM MODEL
+# =========================
+@app.route("/model_remove_tag", methods=["POST"])
+def model_remove_tag():
+    model_id = request.json.get("model_id")
+    tag_id   = request.json.get("tag_id")
+    db = get_db()
+    cursor = db.cursor()
+    cursor.execute("DELETE FROM model_tags WHERE model_id=%s AND tag_id=%s", (model_id, tag_id))
+    db.commit()
+    cursor.close()
+    db.close()
+    return jsonify({"status": "ok"})
+
+# =========================
+# UPDATE MODEL FIELDS
+# =========================
+@app.route("/update_model", methods=["POST"])
+def update_model():
+    data     = request.json
+    model_id = data.get("id")
+    field    = data.get("field")   # trigger_words | source_url | description | base_model
+    value    = data.get("value")
+    allowed  = {"trigger_words", "source_url", "description", "base_model"}
+    if field not in allowed:
+        return jsonify({"error": "invalid field"}), 400
+    db = get_db()
+    cursor = db.cursor()
+    cursor.execute(f"UPDATE models SET {field}=%s WHERE id=%s", (value, model_id))
+    db.commit()
+    cursor.close()
+    db.close()
+    return jsonify({"status": "ok"})
+
+# =========================
+# GET IMAGES FOR MODEL
+# =========================
+@app.route("/model_images/<int:model_id>", methods=["GET"])
+def get_model_images(model_id):
+    db = get_db()
+    cursor = db.cursor(dictionary=True)
+    cursor.execute("SELECT * FROM model_images WHERE model_id=%s ORDER BY id ASC", (model_id,))
+    result = cursor.fetchall()
+    cursor.close()
+    db.close()
+    return jsonify(result)
+
+# =========================
+# RESYNC MODELS
+# =========================
+@app.route("/resync_models", methods=["POST"])
+def resync_models():
+    from model_manager import scan_all_models, sync_database_with_disk, insert_model, get_model_id, sync_model_images
+
+    all_models = scan_all_models()
+    sync_database_with_disk(all_models)
+
+    db = get_db()
+    for model in all_models:
+        insert_model(db, model)
+        model_id = get_model_id(db, model["local_path"])
+        if model_id:
+            sync_model_images(db, model_id, model["extra_images"])
+    db.close()
+
+    # return all models grouped — frontend can filter by type
+    db = get_db()
+    cursor = db.cursor(dictionary=True)
+    cursor.execute("SELECT * FROM models ORDER BY name")
+    result = cursor.fetchall()
+    cursor.close()
+    db.close()
+    return jsonify(result)
+
+# =========================
 # START SERVER (ALWAYS AT THE END)
 # =========================
 if __name__ == "__main__":
