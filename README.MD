@@ -1,95 +1,90 @@
-# ComfyUI LoRA Manager
+# ComfyUI Asset Manager
 
-A local asset manager for ComfyUI LoRA models. Browse, tag, search, and organize your LoRA library with a React frontend and Flask backend.
+A local asset manager for ComfyUI models. Browse, tag, search, and organize your entire model library — LoRAs, Checkpoints, VAEs, Upscalers, and Diffusion models — with a React frontend and Flask backend.
+
+---
 
 ## Features
 
-- 📁 Browse LoRAs organized by folder (FLUX, SDXL, PONY, etc.)
-- 🖼️ Image carousel with auto-detected previews and GIF support
-- 🏷️ Tag system with global tag management
-- 🔍 Search and filter by folder or tag
-- ✏️ Edit trigger words, description, and source URL per LoRA
-- 🔄 Rescan library to sync DB with disk automatically
+- 📁 **Multi-type support** — LoRAs, Checkpoints, VAEs, Upscalers, Diffusion models
+- 🖼️ **Image carousel** — multiple previews per model, GIF support, auto-detected from folder
+- 🧠 **Base model tagging** — FLUX, SDXL, Pony, Illustrious, SD1.5 + add any custom base
+- 🏷️ **Tag system** — global tags shared across all model types
+- 🔍 **Search + filter** — by type, folder, tag, or text search
+- ✏️ **Inline editing** — trigger words, description, source URL per model
+- 🎨 **Color-coded tabs** — each model type has its own accent color
+- 🔄 **Rescan library** — sync DB with disk on startup or on demand
+- 📂 **Open folder** — jump to any model's folder in Explorer
 
-## Stack
-
-- **Frontend:** React (Vite)
-- **Backend:** Python + Flask
-- **Database:** MySQL
+---
 
 ## Project Structure
-
 ```
 comfyui-lora-manager/
 ├── backend/
-│   ├── api.py            # Flask API server
-│   └── lora_manager.py   # Disk scanner and DB sync
+│   ├── api.py               # Flask API server
+│   ├── lora_manager.py      # LoRA scanner + DB sync
+│   ├── model_manager.py     # Checkpoint/VAE/Upscaler/Diffusion scanner
+│   ├── .env                 # Your local credentials (never committed)
+│   └── .env.example         # Setup template
 ├── frontend/
 │   └── src/
+│       ├── App.jsx
 │       └── components/
-│           └── LoraBrowser.jsx
-├── migrate.sql           # DB schema / migrations
+│           ├── LoraBrowser.jsx
+│           └── ModelBrowser.jsx
+├── migrate.sql
+├── migrate_models.sql
+├── start.bat
 └── README.md
 ```
+
+---
 
 ## Setup
 
 ### 1. Database
+Run both SQL files in DBeaver in order: `migrate.sql` then `migrate_models.sql`
 
-Run `migrate.sql` in your MySQL client (DBeaver, Workbench, etc.).
+### 2. Environment
+Copy `backend/.env.example` to `backend/.env` and fill in your values:
+```env
+DB_HOST=localhost
+DB_USER=root
+DB_PASSWORD=your_password
+DB_NAME=comfyui_assets
 
-### 2. Backend
+LORA_FOLDER=C:\path\to\ComfyUI\models\loras
+CHECKPOINT_FOLDER=C:\path\to\ComfyUI\models\checkpoints
+VAE_FOLDER=C:\path\to\ComfyUI\models\vae
+UPSCALER_FOLDER=C:\path\to\ComfyUI\models\upscale_models
+DIFFUSION_FOLDER=C:\path\to\ComfyUI\models\diffusion_models
+```
 
+### 3. Dependencies
 ```bash
-cd backend
-pip install flask flask-cors mysql-connector-python
-python api.py
+pip install flask flask-cors mysql-connector-python python-dotenv
+cd frontend && npm install
 ```
 
-Edit `lora_manager.py` and set your paths:
-```python
-LORA_FOLDER = r"C:\your\path\to\loras"
+### 4. Launch
+Double-click `start.bat` — scans all models, starts API + UI.
 
-DB_CONFIG = {
-    "host": "localhost",
-    "user": "root",
-    "password": "your_password",
-    "database": "comfyui_assets"
-}
+---
+
+## Preview Image Convention
+```
+MyModel.safetensors       ← model
+MyModel.preview.png       ← primary preview
+MyModel_01.png            ← extra image 1
+MyModel_02.gif            ← animated GIF
 ```
 
-### 3. Frontend
+Extras can also go in an `images/` subfolder. Picked up automatically on Rescan.
 
-```bash
-cd frontend
-npm install
-npm run dev
-```
-
-### 4. Initial Scan
-
-```bash
-cd backend
-python lora_manager.py
-```
-
-Then click **⟳ Rescan Library** in the UI anytime you add or remove LoRAs.
-
-## Extra Image Convention
-
-To add multiple previews to a LoRA, name them like this in the same folder:
-
-```
-MyLora.safetensors
-MyLora.preview.png       ← primary preview
-MyLora_01.png            ← extra image 1
-MyLora_02.jpg            ← extra image 2
-MyLora_03.gif            ← animated GIF
-```
-
-Or place them in an `images/` subfolder inside the LoRA's folder.
+---
 
 ## Notes
-
-- The database password and personal paths are in `lora_manager.py` — do not commit those to a public repo. Use the provided `.env.example` as reference.
-- This is a local tool, not intended for production deployment.
+- `.env` is gitignored — your password never leaves your machine
+- Base model is auto-detected from folder names, overridable manually
+- Any custom base model you type is saved and reusable for future models
