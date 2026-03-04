@@ -413,9 +413,9 @@ def update_model():
     model_id = data.get("id")
     field    = data.get("field")   # trigger_words | source_url | description | base_model
     value    = data.get("value")
-    allowed  = {"trigger_words", "source_url", "description", "base_model"}
+    allowed = {"trigger_words", "source_url", "description", "base_model", "rating"}
     if field not in allowed:
-        return jsonify({"error": "invalid field"}), 400
+        return jsonify({"error": "invalid field"}), 400   
     db = get_db()
     cursor = db.cursor()
     cursor.execute(f"UPDATE models SET {field}=%s WHERE id=%s", (value, model_id))
@@ -648,6 +648,19 @@ def drop_image():
 
     return jsonify({"status": "ok", "dest_path": dest_path, "file_name": dest_name})
 
+@app.route("/set_rating", methods=["POST"])
+def set_rating():
+    data      = request.json
+    asset_id  = data.get("id")
+    rating    = int(data.get("rating", 0))
+    table     = "loras" if data.get("asset_type") == "lora" else "models"
+    db = get_db()
+    cursor = db.cursor()
+    cursor.execute(f"UPDATE {table} SET rating=%s WHERE id=%s", (rating, asset_id))
+    db.commit()
+    cursor.close()
+    db.close()
+    return jsonify({"status": "ok"})
 
 # =========================
 # START SERVER (ALWAYS AT THE END)

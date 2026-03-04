@@ -20,6 +20,9 @@ function LoraBrowser({ selectedLoras, setSelectedLoras }) {
   const [isRescanning, setIsRescanning] = useState(false);
   const [hoveredTag, setHoveredTag] = useState(null);
   const [carouselIndex, setCarouselIndex] = useState({});
+  const [page, setPage] = useState(1);
+  const PAGE_SIZE = 48;
+  const [ratingFilter, setRatingFilter] = useState(0);
 
   // =========================
   // INITIAL LOAD
@@ -45,6 +48,7 @@ function LoraBrowser({ selectedLoras, setSelectedLoras }) {
         });
       });
   }, []);
+useEffect(() => { setPage(1); }, [search, selectedTagFilter, selectedFolderFilter, ratingFilter]);
 
   // =========================
   // TAG FUNCTIONS
@@ -168,9 +172,13 @@ function LoraBrowser({ selectedLoras, setSelectedLoras }) {
   // FILTER
   // =========================
   const filtered = loras
-    .filter(l => l.name.toLowerCase().includes(search.toLowerCase()))
-    .filter(l => !selectedTagFilter || (tagsMap[l.id] || []).some(t => t.name === selectedTagFilter))
-    .filter(l => !selectedFolderFilter || getFolderName(l) === selectedFolderFilter);
+  .filter(l => l.name.toLowerCase().includes(search.toLowerCase()))
+  .filter(l => !selectedTagFilter || (tagsMap[l.id] || []).some(t => t.name === selectedTagFilter))
+  .filter(l => !selectedFolderFilter || getFolderName(l) === selectedFolderFilter)
+  .filter(l => !ratingFilter || (l.rating || 0) >= ratingFilter);  
+
+    const totalPages = Math.ceil(filtered.length / PAGE_SIZE);
+    const paginated  = filtered.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
 
   // =========================
   // IMAGE HELPERS
@@ -484,6 +492,35 @@ function LoraBrowser({ selectedLoras, setSelectedLoras }) {
               )}
             </div>
           </div>
+              
+
+              {/* RATING */}
+          <div>
+            <div style={labelStyle}>Rating</div>
+            <div style={{ display: "flex", gap: 4 }}>
+              {[1,2,3,4,5].map(star => (
+                <span key={star}
+                  onClick={async () => {
+                    const newRating = lora.rating === star ? 0 : star;
+                    await fetch("http://127.0.0.1:5000/set_rating", {
+                      method: "POST", headers: { "Content-Type": "application/json" },
+                      body: JSON.stringify({ id: lora.id, asset_type: "lora", rating: newRating })
+                    });
+                    setLoras(p => p.map(x => x.id === lora.id ? { ...x, rating: newRating } : x));
+                    setFocusedLora(p => ({ ...p, rating: newRating }));
+                  }}
+                  style={{ fontSize: 22, cursor: "pointer", color: star <= (lora.rating || 0) ? "#f59e0b" : "#2a2d36", transition: "color 0.1s" }}
+                  onMouseEnter={e => e.target.style.color = "#f59e0b"}
+                  onMouseLeave={e => e.target.style.color = star <= (lora.rating || 0) ? "#f59e0b" : "#2a2d36"}
+                >★</span>
+              ))}
+              {lora.rating > 0 && (
+                <span style={{ fontSize: 11, color: "#555", alignSelf: "center", marginLeft: 4 }}>
+                  {["","★","★★","★★★","★★★★","★★★★★"][lora.rating]}
+                </span>
+              )}
+            </div>
+          </div>
 
           {/* ACTIONS */}
           <div style={{ display: "flex", gap: 8, marginTop: "auto" }}>
@@ -505,7 +542,13 @@ function LoraBrowser({ selectedLoras, setSelectedLoras }) {
       </div>
     );
   }
-
+    function pageBtn(disabled) {
+    return {
+      padding: "5px 10px", borderRadius: 6, border: "1px solid #2a2d36",
+      background: "#1a1d26", color: disabled ? "#333" : "#aaa",
+      cursor: disabled ? "not-allowed" : "pointer", fontSize: 13
+    };
+  }
   // arrow button style helper
   function arrowBtn(side) {
     return {
@@ -561,6 +604,17 @@ function LoraBrowser({ selectedLoras, setSelectedLoras }) {
 
         <div style={{ height: 1, background: "#222", margin: "12px 0" }} />
 
+        <div style={{ height: 1, background: "#222", margin: "12px 0" }} />
+<div style={{ fontSize: 11, color: "#666", textTransform: "uppercase", letterSpacing: 1, marginBottom: 6 }}>Rating mínimo</div>
+<div style={{ display: "flex", gap: 4, padding: "4px 0" }}>
+  {[0,1,2,3,4,5].map(r => (
+    <span key={r} onClick={() => setRatingFilter(r)}
+      style={{ fontSize: 18, cursor: "pointer", color: r === 0 ? (ratingFilter === 0 ? "#4da3ff" : "#333") : r <= ratingFilter ? "#f59e0b" : "#2a2d36" }}>
+      {r === 0 ? "✕" : "★"}
+    </span>
+  ))}
+</div>
+
         {/* TAGS */}
         <div style={{ fontSize: 11, color: "#666", textTransform: "uppercase", letterSpacing: 1, marginBottom: 6 }}>Tags</div>
         <div onClick={() => setSelectedTagFilter(null)}
@@ -593,7 +647,7 @@ function LoraBrowser({ selectedLoras, setSelectedLoras }) {
         })}
       </div>
 
-      {/* GRID + DETAIL */}
+ {/* GRID + DETAIL */}
       <div style={{ flex: 1, display: "flex", gap: 16, minWidth: 0 }}>
 
         <div style={{ flex: 1, minWidth: 0 }}>
@@ -601,7 +655,7 @@ function LoraBrowser({ selectedLoras, setSelectedLoras }) {
             style={{ padding: "10px 14px", width: "100%", marginBottom: 16, background: "#1a1d26", color: "white", border: "1px solid #333", borderRadius: 8, boxSizing: "border-box", fontSize: 13 }}
           />
           <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(150px, 1fr))", gap: "12px" }}>
-            {filtered.map(lora => {
+            {paginated.map(lora => {
               const allImages  = getAllImages(lora);
               const thumb      = allImages[0];
               const isFocused  = focusedLora?.id === lora.id;
@@ -692,9 +746,39 @@ function LoraBrowser({ selectedLoras, setSelectedLoras }) {
               );
             })}
           </div>
+
+          {/* PAGINADOR */}
+          {totalPages > 1 && (
+            <div style={{ display: "flex", justifyContent: "center", alignItems: "center", gap: 8, marginTop: 24, flexWrap: "wrap" }}>
+              <button onClick={() => setPage(1)} disabled={page === 1} style={pageBtn(page === 1)}>«</button>
+              <button onClick={() => setPage(p => Math.max(1, p - 1))} disabled={page === 1} style={pageBtn(page === 1)}>‹</button>
+              {Array.from({ length: totalPages }, (_, i) => i + 1)
+                .filter(n => n === 1 || n === totalPages || Math.abs(n - page) <= 2)
+                .reduce((acc, n, i, arr) => {
+                  if (i > 0 && n - arr[i-1] > 1) acc.push("...");
+                  acc.push(n);
+                  return acc;
+                }, [])
+                .map((n, i) => n === "..." ? (
+                  <span key={"e"+i} style={{ color: "#555", padding: "0 4px" }}>…</span>
+                ) : (
+                  <button key={n} onClick={() => setPage(n)}
+                    style={{ ...pageBtn(false), background: page === n ? "#4da3ff" : "#1a1d26", color: page === n ? "white" : "#aaa", fontWeight: page === n ? 700 : 400 }}>
+                    {n}
+                  </button>
+                ))
+              }
+              <button onClick={() => setPage(p => Math.min(totalPages, p + 1))} disabled={page === totalPages} style={pageBtn(page === totalPages)}>›</button>
+              <button onClick={() => setPage(totalPages)} disabled={page === totalPages} style={pageBtn(page === totalPages)}>»</button>
+              <span style={{ fontSize: 12, color: "#555", marginLeft: 8 }}>
+                {filtered.length} total · página {page} de {totalPages}
+              </span>
+            </div>
+          )}
         </div>
 
         {focusedLora && <DetailPanel lora={focusedLora} />}
+
       </div>
     </div>
   );
