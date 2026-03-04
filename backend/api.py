@@ -535,12 +535,14 @@ def save_prompt():
     db = get_db()
     cursor = db.cursor()
     cursor.execute("""
-        INSERT INTO prompt_gallery
-            (image_path, positive, negative, base_model, loras_used,
-             seed, sampler, scheduler, steps, cfg, width, height, notes)
-        VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)
-    """, (image_path, positive, negative, base_model, loras_used,
-          seed, sampler, scheduler, steps, cfg, width, height, notes))
+    INSERT INTO prompt_gallery
+        (image_path, positive, negative, base_model, loras_used,
+         seed, sampler, steps, cfg, notes, scheduler,
+         width, height)
+    VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)
+""", (image_path, positive, negative, base_model, loras_used,
+      seed, sampler, steps, cfg, notes, scheduler,
+      width, height))
     db.commit()
     new_id = cursor.lastrowid
     cursor.close()
