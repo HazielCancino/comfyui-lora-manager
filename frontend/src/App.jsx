@@ -1,6 +1,7 @@
 import { useState } from "react";
 import LoraBrowser from "./components/LoraBrowser";
 import ModelBrowser from "./components/ModelBrowser";
+import PromptGallery from "./components/PromptGallery";
 
 
 const TABS = [
@@ -9,6 +10,7 @@ const TABS = [
   { id: "vae",         label: "VAEs",        color: "#34d399" },
   { id: "upscaler",    label: "Upscalers",   color: "#f472b6" },
   { id: "diffusion",   label: "Diffusion",   color: "#818cf8" },
+  { id: "prompts",     label: "Prompts",     color: "#fb7185" },
 ];
 
 function App() {
@@ -72,6 +74,7 @@ function App() {
       ) : (
         <ModelBrowser key={activeTab} initialTypeFilter={activeTab} />
       )}
+      if (activeTab === "prompts") return <PromptGallery />;
 
     </div>
   );

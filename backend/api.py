@@ -464,6 +464,189 @@ def resync_models():
     db.close()
     return jsonify(result)
 
+
+# =========================
+# PROMPT GALLERY — GET ALL
+# =========================
+@app.route("/prompts", methods=["GET"])
+def get_prompts():
+    db = get_db()
+    cursor = db.cursor(dictionary=True)
+    cursor.execute("SELECT * FROM prompt_gallery ORDER BY created_at DESC")
+    result = cursor.fetchall()
+    cursor.close()
+    db.close()
+    return jsonify(result)
+
+# =========================
+# PROMPT GALLERY — EXTRACT METADATA FROM IMAGE
+# =========================
+@app.route("/prompts/extract", methods=["POST"])
+def extract_prompt_metadata():
+    import json as _json
+    import tempfile
+
+    # accepts either a file upload (multipart) or a path string (json)
+    if request.files.get("file"):
+        f = request.files["file"]
+        # save to temp file so comfy_metadata can read the PNG chunks
+        suffix = os.path.splitext(f.filename)[1] or ".png"
+        with tempfile.NamedTemporaryFile(delete=False, suffix=suffix) as tmp:
+            f.save(tmp.name)
+            tmp_path = tmp.name
+        from comfy_metadata import extract_metadata
+        meta = extract_metadata(tmp_path)
+        meta["image_path"] = tmp_path   # temp path, user can save permanently later
+        meta["original_filename"] = f.filename
+    else:
+        image_path = request.json.get("image_path", "").strip()
+        if not image_path or not os.path.exists(image_path):
+            return jsonify({"error": "File not found"}), 404
+        from comfy_metadata import extract_metadata
+        meta = extract_metadata(image_path)
+        meta["image_path"] = image_path
+        meta["original_filename"] = os.path.basename(image_path)
+
+    meta["loras_used"] = _json.dumps(meta.get("loras_used", []))
+    return jsonify(meta)
+
+# =========================
+# PROMPT GALLERY — SAVE ENTRY
+# =========================
+@app.route("/prompts/save", methods=["POST"])
+def save_prompt():
+    import json as _json
+    data       = request.json
+    image_path = data.get("image_path", "")
+    positive   = data.get("positive", "")
+    negative   = data.get("negative", "")
+    base_model = data.get("base_model", "")
+    loras_used = data.get("loras_used", "[]")
+    seed       = data.get("seed", "")
+    sampler    = data.get("sampler", "")
+    scheduler  = data.get("scheduler", "")
+    steps      = data.get("steps")
+    cfg        = data.get("cfg")
+    width      = data.get("width")
+    height     = data.get("height")
+    notes      = data.get("notes", "")
+    if isinstance(loras_used, list):
+        loras_used = _json.dumps(loras_used)
+    db = get_db()
+    cursor = db.cursor()
+    cursor.execute("""
+        INSERT INTO prompt_gallery
+            (image_path, positive, negative, base_model, loras_used,
+             seed, sampler, scheduler, steps, cfg, width, height, notes)
+        VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)
+    """, (image_path, positive, negative, base_model, loras_used,
+          seed, sampler, scheduler, steps, cfg, width, height, notes))
+    db.commit()
+    new_id = cursor.lastrowid
+    cursor.close()
+    db.close()
+    return jsonify({"status": "ok", "id": new_id})
+
+# =========================
+# PROMPT GALLERY — UPDATE NOTES
+# =========================
+@app.route("/prompts/update_notes", methods=["POST"])
+def update_prompt_notes():
+    data = request.json
+    db = get_db()
+    cursor = db.cursor()
+    cursor.execute("UPDATE prompt_gallery SET notes=%s WHERE id=%s",
+                   (data.get("notes", ""), data.get("id")))
+    db.commit()
+    cursor.close()
+    db.close()
+    return jsonify({"status": "ok"})
+
+# =========================
+# PROMPT GALLERY — DELETE ENTRY
+# =========================
+@app.route("/prompts/delete", methods=["POST"])
+def delete_prompt():
+    entry_id = request.json.get("id")
+    db = get_db()
+    cursor = db.cursor()
+    cursor.execute("DELETE FROM prompt_gallery WHERE id=%s", (entry_id,))
+    db.commit()
+    cursor.close()
+    db.close()
+    return jsonify({"status": "ok"})
+
+# =========================
+# DRAG & DROP — MOVE IMAGE TO LORA/MODEL FOLDER
+# Renames image to ModelName_NN.ext and registers in DB
+# =========================
+@app.route("/drop_image", methods=["POST"])
+def drop_image():
+    import shutil
+    data       = request.json
+    src_path   = data.get("src_path", "").strip()
+    asset_id   = data.get("asset_id")
+    asset_type = data.get("asset_type")  # "lora" | "model"
+
+    if not src_path or not os.path.exists(src_path):
+        return jsonify({"error": "Source file not found"}), 404
+
+    db = get_db()
+    cursor = db.cursor(dictionary=True)
+    if asset_type == "lora":
+        cursor.execute("SELECT id, name, local_path FROM loras WHERE id=%s", (asset_id,))
+    else:
+        cursor.execute("SELECT id, name, local_path FROM models WHERE id=%s", (asset_id,))
+    asset = cursor.fetchone()
+    cursor.close()
+
+    if not asset:
+        db.close()
+        return jsonify({"error": "Asset not found"}), 404
+
+    asset_folder  = os.path.dirname(asset["local_path"])
+    images_folder = os.path.join(asset_folder, "images")
+    os.makedirs(images_folder, exist_ok=True)
+
+    base_name = os.path.splitext(os.path.basename(asset["local_path"]))[0]
+    ext       = os.path.splitext(src_path)[1].lower()
+
+    # find next available index
+    existing = [
+        f for f in os.listdir(images_folder)
+        if f.startswith(base_name + "_")
+        and os.path.splitext(f)[1].lower() in {".png",".jpg",".jpeg",".webp",".gif"}
+    ]
+    indices = []
+    for f in existing:
+        stem   = os.path.splitext(f)[0]
+        suffix = stem[len(base_name)+1:]
+        if suffix.isdigit():
+            indices.append(int(suffix))
+    next_idx  = (max(indices) + 1) if indices else 1
+    dest_name = f"{base_name}_{next_idx:02d}{ext}"
+    dest_path = os.path.normpath(os.path.join(images_folder, dest_name))
+
+    shutil.move(src_path, dest_path)
+
+    cursor = db.cursor()
+    if asset_type == "lora":
+        cursor.execute(
+            "INSERT INTO lora_images (lora_id, image_path) VALUES (%s, %s)",
+            (asset_id, dest_path)
+        )
+    else:
+        cursor.execute(
+            "INSERT INTO model_images (model_id, image_path) VALUES (%s, %s)",
+            (asset_id, dest_path)
+        )
+    db.commit()
+    cursor.close()
+    db.close()
+
+    return jsonify({"status": "ok", "dest_path": dest_path, "file_name": dest_name})
+
+
 # =========================
 # START SERVER (ALWAYS AT THE END)
 # =========================
