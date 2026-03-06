@@ -1,10 +1,18 @@
-# ComfyUI Asset Manager
+# ComfyUI Model Librarian
 
-A local web app to browse, organize, and annotate your entire ComfyUI model library.
+A standalone local web app to browse, organize, and annotate your entire ComfyUI model library.
 
 ![LoRA Browser](docs/screenshots/lora_browser.png)
 
 > **Note:** The app runs fully locally — no accounts, no background calls, nothing phoning home. Preview images and metadata shown in screenshots were added manually (see [Preview image convention](#preview-image-convention) below). There is no automatic Civitai import yet — that's a planned feature.
+
+---
+
+## Looking for a ComfyUI-integrated solution?
+
+If you want something that lives inside ComfyUI itself with Civitai auto-import, custom nodes, and workflow integration, check out [ComfyUI-Lora-Manager](https://github.com/willmiao/ComfyUI-Lora-Manager) by willmiao — it's the go-to plugin for that use case.
+
+**This project is different:** it runs as a separate standalone app, independently of ComfyUI. No plugin installation needed, and it works even when ComfyUI isn't running.
 
 ---
 
@@ -30,7 +38,7 @@ A local web app to browse, organize, and annotate your entire ComfyUI model libr
 ## Project Structure
 
 ```
-comfyui-lora-manager/
+comfyui-model-librarian/
 ├── backend/
 │   ├── api.py
 │   ├── lora_manager.py
@@ -113,4 +121,3 @@ images/MyModel_03.png   ← or inside an images/ subfolder
 
 - [ ] Auto-import preview images and metadata from Civitai by model hash
 - [ ] A1111 support for Prompt Gallery metadata extraction
-- [ ] Drag & drop image onto model card to assign it as a preview
